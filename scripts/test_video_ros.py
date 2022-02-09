@@ -7,7 +7,7 @@ import cv2 as cv
 from std_msgs.msg import String
 from sensor_msgs.msg import Image, CameraInfo
 from cv_bridge import CvBridge, CvBridgeError
-
+from sensor_msgs.msg import Imu
 
 #guardar = cv.VideoWriter('videoGuardado.avi',cv.VideoWriter_fourcc(*'XVID'),20.0,(640,480))
 guardar = cv.VideoWriter('videoGuardado2.mp4',cv.VideoWriter_fourcc(*'mp4v'),20.0,(1920,1080))
@@ -25,11 +25,12 @@ class Image_converter():
             print
 
         cv.imshow("bebop_image", frame)
-        guardar.write(frame)
+        #guardar.write(frame)
 
         self.key = cv.waitKey(1)
         if self.key == 27:
             rospy.signal_shutdown("ESC para salir")
+
 
 def main(args):
     Image_converter()
