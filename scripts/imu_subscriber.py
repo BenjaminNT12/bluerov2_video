@@ -20,7 +20,8 @@ def normalize_angle(angle):
 
 def callback(data):
     #rpy
-    print(quat_to_angle(data.orientation))
+#    print(round(quat_to_angle(data.orientation),5), round(data.angular_velocity,5), round(data.linear_acceleration,3))
+    print("Orientacion: ",quat_to_angle(data.orientation),"\n", "Velocidad Angular: ", data.angular_velocity,"\n", "Aceleracion lineal: ", data.linear_acceleration,"\n")
     #         The parameter received .DATA is the data of the communication by default to remove Data.Data data in such deforback (data).
 
 def getangle(orientation):
