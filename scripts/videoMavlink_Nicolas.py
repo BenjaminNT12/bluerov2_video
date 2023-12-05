@@ -25,34 +25,34 @@ class Video():
         video_source (string): Udp source ip and port
     """
 
-def __init__(self, port=5600):
-    """Initialize the Video object
+    def __init__(self, port=5600):
+        """Initialize the Video object
 
-    Args:
-        port (int, optional): UDP port
-    """
+        Args:
+            port (int, optional): UDP port
+        """
 
-    Gst.init(None)  # Initialize the GStreamer library
+        Gst.init(None)  # Initialize the GStreamer library
 
-    self.port = port  # Set the port for the video source
-    self._frame = None  # Initialize the frame to None
+        self.port = port  # Set the port for the video source
+        self._frame = None  # Initialize the frame to None
 
-    # Set the video source as a UDP source at the given port
-    self.video_source = 'udpsrc port={}'.format(self.port)
+        # Set the video source as a UDP source at the given port
+        self.video_source = 'udpsrc port={}'.format(self.port)
 
-    # Set the video codec to decode the incoming video stream
-    self.video_codec = '! application/x-rtp, payload=96 ! rtph264depay ! h264parse ! avdec_h264'
+        # Set the video codec to decode the incoming video stream
+        self.video_codec = '! application/x-rtp, payload=96 ! rtph264depay ! h264parse ! avdec_h264'
 
-    # Set the video decode pipeline to convert the video to raw format with BGR color channels
-    self.video_decode = '! decodebin ! videoconvert ! video/x-raw,format=(string)BGR ! videoconvert'
+        # Set the video decode pipeline to convert the video to raw format with BGR color channels
+        self.video_decode = '! decodebin ! videoconvert ! video/x-raw,format=(string)BGR ! videoconvert'
 
-    # Set the video sink configuration to emit signals, not sync to clock and drop old buffers when full
-    self.video_sink_conf = '! appsink emit-signals=true sync=false max-buffers=2 drop=true'
+        # Set the video sink configuration to emit signals, not sync to clock and drop old buffers when full
+        self.video_sink_conf = '! appsink emit-signals=true sync=false max-buffers=2 drop=true'
 
-    self.video_pipe = None  # Initialize the video pipeline to None
-    self.video_sink = None  # Initialize the video sink to None
+        self.video_pipe = None  # Initialize the video pipeline to None
+        self.video_sink = None  # Initialize the video sink to None
 
-    self.run()  # Start the video stream
+        self.run()  # Start the video stream
     
     def start_gst(self, config=None):
         """ Start gstreamer pipeline and sink
