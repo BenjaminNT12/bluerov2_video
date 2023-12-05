@@ -127,6 +127,28 @@ def talker():
         Bbutton = joy_msg.buttons[2]
         Ybutton = joy_msg.buttons[3]
 
+        YawValue = joy_msg.axes[0]
+        PitchValue = joy_msg.axes[1]
+        RollValue = joy_msg.axes[2]
+        ZValue = joy_msg.axes[3]
+
+
+        # Manipular roll y pitch
+        axis_latr =  1500 + (YawValue * 200) * 0.5
+        axis_frwd = 1500 + (PitchValue * 200) * 0.5
+        axis_vrtl = 1500 - (RollValue * 200) * 0.5
+        axis_yaw = 1500 + (ZValue * 50)
+        axis_roll = 1500
+        axis_pitch = 1500
+
+        # Pasa valor de joystick a variables para publicar en topicos de ROS
+        vertical.data = axis_vrtl
+        lateral.data = axis_latr
+        fforward.data = axis_frwd
+        yaw.data = axis_yaw
+        roll.data = axis_roll
+        pitch.data = axis_pitch
+
         # Subscriptores
 
         # Imprimir los botones presionados y los valores de los joysticks
@@ -174,7 +196,7 @@ def talker():
 
         elif Ybutton == 1:
             print("Y button pressed") 
-
+            # aqui es el control del bluerov2
         else:
             pubVertical.publish(vertical);
             pubLateral.publish(lateral);
