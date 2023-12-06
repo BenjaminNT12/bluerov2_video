@@ -114,25 +114,56 @@ def odomCallback(msg):
     linz = msg.twist.twist.linear.z
 
 # Funcion para manejar los mensajes de presion de fluidos recibidos
+# def presCallback(msg):
+#     global zbf_a, fluid_press
+
+#     # Extraer la presion del fluido y la varianza del mensaje
+#     fluid_press = msg.fluid_pressure
+#     diff_press = msg.variance
+
+#     # Calcular z_baro a partir de la presion del fluido
+#     z_baro = fluid_press - 802.6
+
+#     # Calcular el coeficiente de filtrado a_z
+#     a_z = 0.1061
+
+#     # Calcular la z filtrada
+#     zbf = a_z * z_baro + (1 - a_z) * zbf_a
+
+#     # Actualizar zbf_a para la proxima iteracion
+#     zbf_a = zbf
+
 def presCallback(msg):
-    global zbf_a, fluid_press
+    global depth
 
-    # Extraer la presion del fluido y la varianza del mensaje
+    # Extraer la presión del fluido del mensaje
     fluid_press = msg.fluid_pressure
-    diff_press = msg.variance
 
-    # Calcular z_baro a partir de la presion del fluido
-    z_baro = fluid_press - 802.6
+    # Definir la presión atmosférica y la densidad del fluido (agua de mar)
+    atmospheric_pressure = 101325  # en Pascales
+    fluid_density = 1029  # en kg/m^3
 
-    # Calcular el coeficiente de filtrado a_z
-    a_z = 0.1061
+    # Definir la aceleración de la gravedad
+    g = 9.81  # en m/s^2
 
-    # Calcular la z filtrada
-    zbf = a_z * z_baro + (1 - a_z) * zbf_a
+    # Calcular la profundidad
+    depth = (fluid_press - atmospheric_pressure) / (fluid_density * g)
 
-    # Actualizar zbf_a para la proxima iteracion
-    zbf_a = zbf
 
+# def depthCallback(msg):
+#     global depth
+
+#     # Extraer la presión del fluido del mensaje
+#     fluid_press = msg.fluid_pressure
+
+#     # Definir la presión atmosférica en Pascales
+#     atmospheric_pressure = 101325  # en Pascales
+
+#     # Definir la constante de conversión de Pascal a metros de agua
+#     pascal_to_m_water = 0.00010199773339984054
+
+#     # Calcular la profundidad en metros de agua
+#     depth = (fluid_press - atmospheric_pressure) * pascal_to_m_water
 
 def batteryCallback(msg):
     global voltageBattery, currentBattery, percentageBattery
@@ -203,7 +234,7 @@ def talker():
         #print("Joystick values: ", joy_msg.axes)
 
         if Abutton == 1:
-            print("A button pressed Bluerov2 Armed")
+            print("Bluerov2 Armed")
 
             # Establecer el valor del mensaje en True para armar el ROV
             arm_msg.data = True
@@ -212,7 +243,7 @@ def talker():
             pubArmar.publish(arm_msg)
 
         elif Xbutton == 1:
-            print("X button pressed Bluerov2 Disarm")
+            print("Bluerov2 Disarm")
 
             # Asignar valores a los datos de los mensajes
             mode.data = "manual"
