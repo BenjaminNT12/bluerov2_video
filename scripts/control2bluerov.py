@@ -110,61 +110,12 @@ def odomCallback(msg):
     odomTwistLinZ = msg.twist.twist.linear.z
 
 # Funcion para manejar los mensajes de presion de fluidos recibidos
-# def presCallback(msg):
-#     global zbf_a, fluid_press
-
-#     # Extraer la presion del fluido y la varianza del mensaje
-#     fluid_press = msg.fluid_pressure
-#     diff_press = msg.variance
-
-#     # Calcular z_baro a partir de la presion del fluido
-#     z_baro = fluid_press - 802.6
-
-#     # Calcular el coeficiente de filtrado a_z
-#     a_z = 0.1061
-
-#     # Calcular la z filtrada
-#     zbf = a_z * z_baro + (1 - a_z) * zbf_a
-
-#     # Actualizar zbf_a para la proxima iteracion
-#     zbf_a = zbf
-
 def presCallback(msg):
-    global depth
+    global zbf_a, fluid_press
 
-<<<<<<< HEAD
-    # Extraer la presión del fluido del mensaje
-    fluid_press = msg.fluid_pressure
-
-    # Definir la presión atmosférica y la densidad del fluido (agua de mar)
-    atmospheric_pressure = 101325  # en Pascales
-    fluid_density = 1029  # en kg/m^3
-
-    # Definir la aceleración de la gravedad
-    g = 9.81  # en m/s^2
-
-    # Calcular la profundidad
-    depth = (fluid_press - atmospheric_pressure) / (fluid_density * g)
-
-=======
     msgFluidPress = msg.fluid_pressure
     msgVariance = msg.variance
->>>>>>> cfdf3dd (control bluerov)
 
-# def depthCallback(msg):
-#     global depth
-
-#     # Extraer la presión del fluido del mensaje
-#     fluid_press = msg.fluid_pressure
-
-#     # Definir la presión atmosférica en Pascales
-#     atmospheric_pressure = 101325  # en Pascales
-
-#     # Definir la constante de conversión de Pascal a metros de agua
-#     pascal_to_m_water = 0.00010199773339984054
-
-#     # Calcular la profundidad en metros de agua
-#     depth = (fluid_press - atmospheric_pressure) * pascal_to_m_water
 
 def batteryCallback(msg):
     global msgBatteryVoltage, msgBatteryCurrent, msgBatteryPercentage
@@ -279,38 +230,6 @@ def talker():
         # msgPitch.data = joy_msg.axes[5]*100 + 1500
 
         if Abutton == 1:
-<<<<<<< HEAD
-            print("Bluerov2 Armed")
-
-            # Establecer el valor del mensaje en True para armar el ROV
-            arm_msg.data = True
-
-            # Publicar el mensaje 
-            pubArmar.publish(arm_msg)
-
-        elif Xbutton == 1:
-            print("Bluerov2 Disarm")
-
-            # Asignar valores a los datos de los mensajes
-            mode.data = "manual"
-            arm_msg.data = False
-            vertical.data = 1500
-            lateral.data = 1500
-            fforward.data = 1500
-            yaw.data = 1500
-            roll.data = 1500
-            pitch.data = 1500
-
-            # Publicar los mensajes
-            pubArmar.publish(arm_msg)
-            pubVertical.publish(vertical)
-            pubLateral.publish(lateral)
-            pubForward.publish(fforward)
-            pubYaw.publish(yaw)
-            pubRoll.publish(roll)
-            pubPitch.publish(pitch)
-            pubModeSet.publish(mode)
-=======
             print("A button pressed Bluerov2 Armed")
             # armBluerov2()
             stopBluerov2()
@@ -331,7 +250,6 @@ def talker():
         elif Xbutton == 1:
             print("X button pressed Bluerov2 Disarm")
             stopBluerov2()
->>>>>>> cfdf3dd (control bluerov)
 
         elif Bbutton == 1:
             print("B button pressed") 
@@ -359,7 +277,6 @@ def talker():
                           "yaw Deseada: ", yawDesired, 
                           "Control:", output)
         rate.sleep()
-
 if __name__ == '__main__':
     try:
         talker()
