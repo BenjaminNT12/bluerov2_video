@@ -8,21 +8,21 @@ from tf.transformations import euler_from_quaternion, quaternion_from_euler
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import TwistStamped, PoseStamped
 import math
-
+import time
 
 # Crear los mensajes
-arm_msg = Bool()
-vertical = UInt16()
-lateral = UInt16()
-fforward = UInt16()
-yaw = UInt16()
-roll = UInt16()
-pitch = UInt16()
-mode = String()
+msgArm = Bool()
+msgDeph = UInt16()
+msgLateral = UInt16()
+msgForward = UInt16()
+msgYaw = UInt16()
+msgRoll = UInt16()
+msgPitch = UInt16()
+msgModeSet = String()
 
 # Crear los publicadores
-pubArmar = rospy.Publisher('/BlueRov2/arm', Bool, queue_size=10)
-pubVertical = rospy.Publisher('BlueRov2/rc_channel3/set_pwm', UInt16, queue_size=1)
+pubArm = rospy.Publisher('/BlueRov2/arm', Bool, queue_size=10)
+pubDeph = rospy.Publisher('BlueRov2/rc_channel3/set_pwm', UInt16, queue_size=1)
 pubLateral = rospy.Publisher('BlueRov2/rc_channel6/set_pwm', UInt16, queue_size=1)
 pubForward = rospy.Publisher('BlueRov2/rc_channel5/set_pwm', UInt16, queue_size=1)
 pubYaw = rospy.Publisher('BlueRov2/rc_channel4/set_pwm', UInt16, queue_size=1)
@@ -30,88 +30,80 @@ pubRoll = rospy.Publisher('BlueRov2/rc_channel2/set_pwm', UInt16, queue_size=1)
 pubPitch = rospy.Publisher('BlueRov2/rc_channel1/set_pwm', UInt16, queue_size=1)
 pubModeSet = rospy.Publisher('/BlueRov2/mode/set', String, queue_size=10)
 
-orx = ory = orz = orw = 0.0
-velX = velY = velZ = 0.0
-linAccX = linAccY = linAccZ = 0.0
+imuOrientX = imuOrientY = imuOrientZ = imuOrientW = 0.0
+imuVelX = imuVelY = imuVelZ = 0.0
+imuLinAccX = imuLinAccY = imuLinAccZ = 0.0
 
-posroll = 0.0
-pospitch = 0.0
-posyaw = 0.0
+odomPosePosX = odomPosePosY = odomPosePosZ = 0.0
+odomPoseOriX = odomPoseOriY = odomPoseOriZ = odomPoseOriW = 0.0
+odomTwistLinX = odomTwistLinY = odomTwistLinZ = 0.0
 
-zbf_a = 0.0
-fluid_press = 0.0
+msgBatteryVoltage = msgBatteryCurrent = msgBatteryPercentage = 0.0
 
-posay = posaz = posaw = 0.0
+msgFluidPress = 0.0
+msgVariance = 0.0
 
-posx = posy = posz = posax = 0.0
-orix = oriy = oriz = oriw = 0.0
-linx = liny = linz = 0.0
+# yawDes = math.sin(t)
+kpYaw = 1.5 
+kdYaw = 0.5
+T = 0.0
 
-voltageBattery = currentBattery = percentageBattery = 0.0
-
+posrollrad = pospitchrad = posyawrad = 0.0
 
 def rad_to_deg(rad):
     return rad * (180.0 / math.pi)
 
-def write_to_file(data):
-    with open('output.txt', 'w') as f:
-        f.write(str(data))
+def write_to_file(*args):
+    filename = 'output.txt'
+    
+    # Check if file exists, if not, create it
+    if not os.path.exists(filename):
+        open(filename, 'w').close()
+    
+    # Open the file in append mode
+    with open(filename, 'a') as f:
+        # Iterate over each argument
+        for data in args:
+            # Write the data followed by a newline
+            f.write(str(data) + '\n')
 
-def posCallback(msg):
-    global posroll, pospitch, posyaw
-    global orx, ory, orz, orw
-    global velX, velY, velZ
-    global linAccX, linAccY, linAccZ
-    # Extraer los componentes de la orientacion del mensaje
-    orx = msg.orientation.x
-    ory = msg.orientation.y
-    orz = msg.orientation.z
-    orw = msg.orientation.w
+def imuCallback(msg):
+    global imuOrientX, imuOrientY, imuOrientZ, imuOrientW
+    global imuVelX, imuVelY, imuVelZ
+    global imuLinAccX, imuLinAccY, imuLinAccZ
 
-    # Extraer los componentes de la velocidad angular del mensaje
-    velX = msg.angular_velocity.x
-    velY = msg.angular_velocity.y
-    velZ = msg.angular_velocity.z
+    imuOrientX = msg.orientation.x
+    imuOrientY = msg.orientation.y
+    imuOrientZ = msg.orientation.z
+    imuOrientW = msg.orientation.w
 
-    linAccX = msg.linear_acceleration.x
-    linAccY = msg.linear_acceleration.y
-    linAccZ = msg.linear_acceleration.z
+    imuVelX = msg.angular_velocity.x
+    imuVelY = msg.angular_velocity.y
+    imuVelZ = msg.angular_velocity.z
 
-    # Crear un cuaternion a partir de los componentes de la orientacion
-    quaternion = (orx, ory, orz, orw)
-
-    # Convertir el cuaternion a angulos de Euler (roll, pitch, yaw)
-    posrollrad, pospitchrad, posyawrad = euler_from_quaternion(quaternion)
-
-    # Convertir los angulos de radianes a grados
-    posroll = math.degrees(posrollrad)
-    pospitch = -1 * math.degrees(pospitchrad)
-    posyaw = math.degrees(posyawrad)
-
-    # Si el angulo de yaw es positivo, restarle 360
-    if posyaw > 0:
-        posyaw = posyaw - 360
-
-
+    imuLinAccX = msg.linear_acceleration.x
+    imuLinAccY = msg.linear_acceleration.y
+    imuLinAccZ = msg.linear_acceleration.z
 
 # Funcion para manejar los mensajes de odometria recibidos
 def odomCallback(msg):
-    global posx, posy, posz
-    global orix, oriy, oriz, oriw
-    global linx, liny, linz
+    global odomPosePosx, odomPosePosy, odomPosePosz
+    global odomPoseOrix, odomPoseOriy, odomPoseOriz, odomPoseOriw
+    global odomTwistLinX, odomTwistLinY, odomTwistLinZ
+
     # Extraer la informacion de posicion del mensaje de Odometria
-    posx = msg.pose.pose.position.x
-    posy = msg.pose.pose.position.y
-    posz = msg.pose.pose.position.z
+    odomPosePosX = msg.pose.pose.position.x
+    odomPosePosY = msg.pose.pose.position.y
+    odomPosePosZ = msg.pose.pose.position.z
 
-    orix = msg.pose.pose.orientation.x
-    oriy = msg.pose.pose.orientation.y
-    oriz = msg.pose.pose.orientation.z
-    oriw = msg.pose.pose.orientation.w
+    odomPoseOriX = msg.pose.pose.orientation.x
+    odomPoseOriY = msg.pose.pose.orientation.y
+    odomPoseOriZ = msg.pose.pose.orientation.z
+    odomPoseOriW = msg.pose.pose.orientation.w
 
-    linx = msg.twist.twist.linear.x
-    liny = msg.twist.twist.linear.y
-    linz = msg.twist.twist.linear.z
+    odomTwistLinX = msg.twist.twist.linear.x
+    odomTwistLinY = msg.twist.twist.linear.y
+    odomTwistLinZ = msg.twist.twist.linear.z
 
 # Funcion para manejar los mensajes de presion de fluidos recibidos
 # def presCallback(msg):
@@ -136,6 +128,7 @@ def odomCallback(msg):
 def presCallback(msg):
     global depth
 
+<<<<<<< HEAD
     # Extraer la presión del fluido del mensaje
     fluid_press = msg.fluid_pressure
 
@@ -149,6 +142,10 @@ def presCallback(msg):
     # Calcular la profundidad
     depth = (fluid_press - atmospheric_pressure) / (fluid_density * g)
 
+=======
+    msgFluidPress = msg.fluid_pressure
+    msgVariance = msg.variance
+>>>>>>> cfdf3dd (control bluerov)
 
 # def depthCallback(msg):
 #     global depth
@@ -166,43 +163,85 @@ def presCallback(msg):
 #     depth = (fluid_press - atmospheric_pressure) * pascal_to_m_water
 
 def batteryCallback(msg):
-    global voltageBattery, currentBattery, percentageBattery
+    global batteryVoltage, batteryCurrent, batteryPercentage
 
-    voltageBattery = msg.voltage
-    currentBattery = msg.current
-    percentageBattery = msg.percentage
-    pass
+    batteryVoltage = msg.voltage
+    batteryCurrent = msg.current
+    batteryPercentage = msg.percentage
+
+def stopBluerov2():
+    global msgArm, msgDeph, msgLateral, msgForward, msgYaw, msgRoll, msgPitch, msgModeSet
+    global pubArm, pubDeph, pubLateral, pubForward, pubYaw, pubRoll, pubPitch, pubModeSet
+
+    msgModeSet.data = "manual"
+    msgArm.data = False
+    msgDeph.data = 1500
+    msgLateral.data = 1500
+    msgForward.data = 1500
+    msgYaw.data = 1500
+    msgRoll.data = 1500
+    msgPitch.data = 1500
+
+    pubArm.publish(msgArm)
+    pubLateral.publish(msgLateral)
+    pubDeph.publish(msgDeph)
+    pubForward.publish(msgForward)
+    pubYaw.publish(msgYaw)
+    pubRoll.publish(msgRoll)
+    pubPitch.publish(msgPitch)
+    pubModeSet.publish(msgModeSet)
+
+def armBluerov2():
+    global msgArm, pubArm
+
+    msgArm.data = True
+    pubArm.publish(msgArm)
+
+def controlPDYaw(kp, kd, yawP, yawD, t):
+    
+    errosYaw = yawD-yawP
+    P = kp * errosYaw
+    D = kd * (errosYaw - errorOld)/t
+    u = P + D
+    uThrusters = 1500 + u
+    errorOld = errosYaw
+
+    if uThrusters > 1600:
+        uThrusters = 1600
+    elif uThrusters < 1400:
+        uThrusters = 1400
+
+    return uThrusters
+
+def calculatePose(x, y, z, w):
+    quaternion = (x, y, z, w)
+    poseRollRad, posePitchRad, poseYawRad = euler_from_quaternion(quaternion)
+
+    poseRollDegree = math.degrees(poseRollRad)
+    posePitchDegree = math.degrees(posePitchRad)
+    poseYawDegree = math.degrees(poseYawRad)
+
+    return poseRollDegree, posePitchDegree, poseYawDegree
 
 def talker():
-
-    # Inicializar el nodo de ROS
-    rospy.init_node('logitech_controller') 
-    pub = rospy.Publisher('joy', Joy, queue_size=10)
-    rate = rospy.Rate(10) # 10hz
-
+    t = 0.0
+    integracionTime = 0.05
     # Inicializar pygame
     pygame.init()
     pygame.joystick.init()
     joystick = pygame.joystick.Joystick(0)
     joystick.init()
+    # Crear los suscriptores
+    subPos = rospy.Subscriber("/BlueRov2/imu/data", Imu, imuCallback)  
 
     while not rospy.is_shutdown(): 
         pygame.event.pump()
-        # Subscriptores
-        subPos = rospy.Subscriber("/BlueRov2/imu/data", Imu, posCallback)  # Topico real
-        odomPos = rospy.Subscriber("/BlueRov2/odometry", Odometry, odomCallback)  # Topico real
-        pres = rospy.Subscriber("/BlueRov2/pressure", FluidPressure, presCallback)
-        subBattery = rospy.Subscriber("/BlueRov2/battery", BatteryState, batteryCallback)
-
-
-        print("subPos: ",orx ,ory ,orz ,orw ,velX ,velY ,velZ ,linAccX ,linAccY ,linAccZ, posroll, pospitch, posyaw)
-        print("odomPos: ", posx, posy, posz, orix, oriy, oriz, oriw, linx, liny, linz)
-        print("Pressure: ", fluid_press)
-        print("Battery: ", voltageBattery, currentBattery, percentageBattery)
-
-        # Crear un mensaje Joy
         joy_msg = Joy()
-        joy_msg.header.stamp = rospy.Time.now()
+        T = t + integracionTime
+        t = T
+        yawDesired = math.degrees(2*math.sin(T))*math.degrees(math.cos(0.25*T)-0.5)
+    
+        Roll, Pitch, Yaw = calculatePose(imuOrientX, imuOrientY, imuOrientZ, imuOrientW)
 
         # Obtener los datos del joystick 
         for i in range(joystick.get_numaxes()): 
@@ -224,16 +263,17 @@ def talker():
         # Manipular roll y pitch
         vertical.data = 1500 - (RollValue * 200) * 0.5
         lateral.data =  1500 + (YawValue * 200) * 0.5
-        fforward.data = 1500 + (PitchValue * 200) * 0.5
+        fforward.data = 1500 + -1*(PitchValue * 200) * 0.5
         yaw.data = 1500 + (ZValue * 50)
         roll.data = 1500
         pitch.data = 1500
 
         # Imprimir los botones presionados y los valores de los joysticks
-        #print("Buttons pressed: ", joy_msg.buttons)
-        #print("Joystick values: ", joy_msg.axes)
+        # print("Buttons pressed: ", joy_msg.buttons)
+        # print("Joystick values: ", joy_msg.axes)
 
         if Abutton == 1:
+<<<<<<< HEAD
             print("Bluerov2 Armed")
 
             # Establecer el valor del mensaje en True para armar el ROV
@@ -264,10 +304,22 @@ def talker():
             pubRoll.publish(roll)
             pubPitch.publish(pitch)
             pubModeSet.publish(mode)
+=======
+            print("A button pressed Bluerov2 Armed")
+            armBluerov2()
+
+        elif Xbutton == 1:
+            print("X button pressed Bluerov2 Disarm")
+            stopBluerov2()
+>>>>>>> cfdf3dd (control bluerov)
 
         elif Bbutton == 1:
             print("B button pressed") 
-
+            armBluerov2()
+            output = controlPDYaw(kpYaw, kdYaw, Yaw, yawDesired, T)
+            pubYaw.publish(output);
+            print("yaw: ", Yaw, "yaw Deseada: ", yawDesired, "Control:", output)
+            write_to_file("yaw: ", Yaw, "yaw Deseada: ", yawDesired, "Control:", output)
 
 
         elif Ybutton == 1:
@@ -275,19 +327,18 @@ def talker():
             # aqui es el control del bluerov2
             mode.data = "manual"
             pubModeSet.publish(mode)
+
         else:
-            pubVertical.publish(vertical);
+            pubDeph.publish(vertical);
             pubLateral.publish(lateral);
             pubForward.publish(fforward);
             pubYaw.publish(yaw);
             pubRoll.publish(roll);
             pubPitch.publish(pitch);  
 
-        # Publicar el mensaje 
-        pub.publish(joy_msg)
         rate.sleep()
 
-if __name__ == '__main__':
+if _name_ == '_main_':
     try:
         talker()
     except rospy.ROSInterruptException:
