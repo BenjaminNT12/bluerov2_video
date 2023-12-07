@@ -9,6 +9,7 @@ from nav_msgs.msg import Odometry
 from geometry_msgs.msg import TwistStamped, PoseStamped
 import math
 import time
+import os
 
 # Crear los mensajes
 msgArm = Bool()
@@ -43,6 +44,9 @@ msgBatteryVoltage = msgBatteryCurrent = msgBatteryPercentage = 0.0
 msgFluidPress = 0.0
 msgVariance = 0.0
 
+errorOld = 0.0
+errosYaw = 0.0
+
 # yawDes = math.sin(t)
 kpYaw = 1.5 
 kdYaw = 0.5
@@ -53,8 +57,7 @@ posrollrad = pospitchrad = posyawrad = 0.0
 def rad_to_deg(rad):
     return rad * (180.0 / math.pi)
 
-def write_to_file(*args):
-    filename = 'output.txt'
+def write_to_file(filename, *args):
     
     # Check if file exists, if not, create it
     if not os.path.exists(filename):
@@ -65,7 +68,8 @@ def write_to_file(*args):
         # Iterate over each argument
         for data in args:
             # Write the data followed by a newline
-            f.write(str(data) + '\n')
+            f.write(str(data)+' ')
+        f.write('\n')
 
 def imuCallback(msg):
     global imuOrientX, imuOrientY, imuOrientZ, imuOrientW
@@ -163,11 +167,11 @@ def presCallback(msg):
 #     depth = (fluid_press - atmospheric_pressure) * pascal_to_m_water
 
 def batteryCallback(msg):
-    global batteryVoltage, batteryCurrent, batteryPercentage
+    global msgBatteryVoltage, msgBatteryCurrent, msgBatteryPercentage
 
-    batteryVoltage = msg.voltage
-    batteryCurrent = msg.current
-    batteryPercentage = msg.percentage
+    msgBatteryVoltage = msg.voltage
+    msgBatteryCurrent = msg.current
+    msgBatteryPercentage = msg.percentage
 
 def stopBluerov2():
     global msgArm, msgDeph, msgLateral, msgForward, msgYaw, msgRoll, msgPitch, msgModeSet
@@ -198,7 +202,8 @@ def armBluerov2():
     pubArm.publish(msgArm)
 
 def controlPDYaw(kp, kd, yawP, yawD, t):
-    
+    global errorOld, errosYaw
+
     errosYaw = yawD-yawP
     P = kp * errosYaw
     D = kd * (errosYaw - errorOld)/t
@@ -223,10 +228,23 @@ def calculatePose(x, y, z, w):
 
     return poseRollDegree, posePitchDegree, poseYawDegree
 
+def manualControl(forward, lateral, yaw, deph, roll, pitch):
+    global pubDeph, pubLateral, pubForward, pubYaw, pubRoll, pubPitch
+
+    pubForward.publish(forward);
+    pubLateral.publish(lateral);
+    pubYaw.publish(yaw);
+    pubDeph.publish(deph);
+    pubRoll.publish(roll);
+    pubPitch.publish(pitch);  
+
 def talker():
     t = 0.0
     integracionTime = 0.05
-    # Inicializar pygame
+
+    rospy.init_node('control2bluerov', anonymous=True)
+    pub = rospy.Publisher('chatter', String, queue_size=10)
+    rate = rospy.Rate(20) # 10hz
     pygame.init()
     pygame.joystick.init()
     joystick = pygame.joystick.Joystick(0)
@@ -240,10 +258,8 @@ def talker():
         T = t + integracionTime
         t = T
         yawDesired = math.degrees(2*math.sin(T))*math.degrees(math.cos(0.25*T)-0.5)
-    
         Roll, Pitch, Yaw = calculatePose(imuOrientX, imuOrientY, imuOrientZ, imuOrientW)
 
-        # Obtener los datos del joystick 
         for i in range(joystick.get_numaxes()): 
             joy_msg.axes.append(joystick.get_axis(i))
 
@@ -255,22 +271,12 @@ def talker():
         Bbutton = joy_msg.buttons[2]
         Ybutton = joy_msg.buttons[3]
 
-        YawValue = joy_msg.axes[0]
-        PitchValue = joy_msg.axes[1]
-        RollValue = joy_msg.axes[2]
-        ZValue = joy_msg.axes[3]
-
-        # Manipular roll y pitch
-        vertical.data = 1500 - (RollValue * 200) * 0.5
-        lateral.data =  1500 + (YawValue * 200) * 0.5
-        fforward.data = 1500 + -1*(PitchValue * 200) * 0.5
-        yaw.data = 1500 + (ZValue * 50)
-        roll.data = 1500
-        pitch.data = 1500
-
-        # Imprimir los botones presionados y los valores de los joysticks
-        # print("Buttons pressed: ", joy_msg.buttons)
-        # print("Joystick values: ", joy_msg.axes)
+        msgLateral.data = joy_msg.axes[0]*100 + 1500
+        msgForward.data = joy_msg.axes[1]*100 + 1500
+        msgYaw.data = joy_msg.axes[2]*100 + 1500
+        msgDeph.data = joy_msg.axes[3]*100 + 1500
+        # msgRoll.data = joy_msg.axes[4]*100 + 1500
+        # msgPitch.data = joy_msg.axes[5]*100 + 1500
 
         if Abutton == 1:
 <<<<<<< HEAD
@@ -306,7 +312,21 @@ def talker():
             pubModeSet.publish(mode)
 =======
             print("A button pressed Bluerov2 Armed")
-            armBluerov2()
+            # armBluerov2()
+            stopBluerov2()
+            manualControl(msgForward, msgLateral, msgYaw, msgDeph, msgRoll, msgPitch);
+            print("Forward: ", msgForward,
+                  "Lateral: ", msgLateral,
+                  "Yaw: ", msgYaw,
+                  "Deph: ", msgDeph, 
+                  "Roll: ", msgRoll,
+                  "Pitch: ", msgPitch)
+            write_to_file('manual.txt', "Forward ", msgForward,
+                          "Lateral ", msgLateral,
+                          "Yaw ", msgYaw, 
+                          "Deph ", msgDeph,
+                          "Roll ", msgRoll,
+                          "Pitch ", msgPitch)
 
         elif Xbutton == 1:
             print("X button pressed Bluerov2 Disarm")
@@ -318,27 +338,29 @@ def talker():
             armBluerov2()
             output = controlPDYaw(kpYaw, kdYaw, Yaw, yawDesired, T)
             pubYaw.publish(output);
-            print("yaw: ", Yaw, "yaw Deseada: ", yawDesired, "Control:", output)
-            write_to_file("yaw: ", Yaw, "yaw Deseada: ", yawDesired, "Control:", output)
-
-
+            print("yaw: ", Yaw,
+                  "yaw Deseada: ", yawDesired,
+                  "Control:", output)
+            
+            write_to_file("control.txt", "yaw: ", Yaw,
+                          "yaw Deseada: ", yawDesired, 
+                          "Control:", output)
+            
         elif Ybutton == 1:
             print("Y button pressed") 
-            # aqui es el control del bluerov2
-            mode.data = "manual"
-            pubModeSet.publish(mode)
-
-        else:
-            pubDeph.publish(vertical);
-            pubLateral.publish(lateral);
-            pubForward.publish(fforward);
-            pubYaw.publish(yaw);
-            pubRoll.publish(roll);
-            pubPitch.publish(pitch);  
-
+            armBluerov2()
+            output = controlPDYaw(kpYaw, kdYaw, Yaw, yawDesired, T)
+            # pubYaw.publish(output);
+            print("yaw: ", Yaw,
+                  "yaw Deseada: ", yawDesired,
+                  "Control:", output)
+            
+            write_to_file("control.txt", "yaw: ", Yaw,
+                          "yaw Deseada: ", yawDesired, 
+                          "Control:", output)
         rate.sleep()
 
-if _name_ == '_main_':
+if __name__ == '__main__':
     try:
         talker()
     except rospy.ROSInterruptException:
