@@ -132,7 +132,6 @@ def presCallback(msg):
     msgFluidPress = msg.fluid_pressure
     msgVariance = msg.variance
 
-
 def batteryCallback(msg):
     global msgBatteryVoltage, msgBatteryCurrent, msgBatteryPercentage
 
@@ -178,11 +177,6 @@ def controlPDYaw(kp, kd, yawP, yawD, t):
     uThrusters = 1500 + u
     errorOld = errosYaw
 
-    # if uThrusters > 1700:
-    #     uThrusters = 1700
-    # elif uThrusters < 1300:
-    #     uThrusters = 1300
-
     return uThrusters
 
 def calculatePose(x, y, z, w):
@@ -213,17 +207,21 @@ def trajectoryControl(t):
 
     return yawDesired
 
-def talker():
+def main():
     t = 0.0
     integracionTime = 0.05
 
+    # Inicializar el nodo de ROS
     rospy.init_node('control2bluerov', anonymous=True)
     pub = rospy.Publisher('chatter', String, queue_size=10)
     rate = rospy.Rate(20) # 10hz
+
+    # Inicializa todos los módulos importados de Pygame
     pygame.init()
     pygame.joystick.init()
     joystick = pygame.joystick.Joystick(0)
     joystick.init()
+
     # Crear los suscriptores
     subPos = rospy.Subscriber("/BlueRov2/imu/data", Imu, imuCallback)  
     armed = False
@@ -259,8 +257,16 @@ def talker():
             armed = True
             print("A button pressed Bluerov2 Armed")
             armBluerov2()
-            manualControl(msgForward, msgLateral, msgYaw, msgDeph, msgRoll, msgPitch);
-            print("Yaw degrees: ",Yaw, "Yaw Deseada: ", yawDesired)
+            manualControl(msgForward, 
+                          msgLateral, 
+                          msgYaw, 
+                          msgDeph, 
+                          msgRoll, 
+                          msgPitch);
+            
+            print("Yaw degrees: ",Yaw, 
+                  "Yaw Deseada: ", yawDesired)
+            
             write_to_file('manual', "Forward ", msgForward,
                           "Lateral ", msgLateral,
                           "Yaw ", msgYaw, 
@@ -280,17 +286,18 @@ def talker():
             armBluerov2()
             output = controlPDYaw(kpYaw, kdYaw, Yaw, yawDesired, T)
             pubYaw.publish(output);
+
+            # imprime en pantalla los valores de los angulos, el control y el error
             print("yaw: ", Yaw,
                   "yaw Deseada: ", yawDesired,
                   "Control:", output,
                   "Error: ", Yaw-yawDesired)
             
+            # Guarda los datos en un archivo de texto
             write_to_file("control",  "yaw: ", Yaw,
                           "yaw Deseada: ", yawDesired, 
                           "Control:", output,
                           "Error: ", Yaw-yawDesired)
-            
-            
             
         elif Ybutton == 1:
             print("Y button pressed") 
@@ -300,7 +307,7 @@ def talker():
 
 if __name__ == '__main__':
     try:
-        talker()
+        main()
     except rospy.ROSInterruptException:
         pass
 
