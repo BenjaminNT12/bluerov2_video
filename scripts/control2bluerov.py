@@ -62,53 +62,30 @@ fig, ax = plt.subplots()
 def rad_to_deg(rad):
     return rad * (180.0 / math.pi)
 
-# def write_to_file(filename, *args):
-    
-#     # Check if file exists, if not, create it
-#     if not os.path.exists(filename):
-#         open(filename, 'w').close()
-    
-#     # Open the file in append mode
-#     with open(filename, 'a') as f:
-#         # Iterate over each argument
-#         for data in args:
-#             # Write the data followed by a newline
-#             f.write(str(data)+' ')
-#         f.write('\n')
-
-
 
 def write_to_file(filename, *args):
-    # Obtener la fecha y la hora actual
+    # Get the current date and time
     now = datetime.datetime.now()
-
-    # Formatear la fecha y la hora en una cadena sin segundos
+    
+    # Format the date and time as a string
     timestamp = now.strftime("%Y-%m-%d_%H-%M")
-
-    # Agregar la cadena de fecha y hora al nombre del archivo
-    filename_with_timestamp = "{}_{}".format(filename, timestamp)
-
-    # Check if file exists
-    if os.path.exists(filename_with_timestamp):
-        # Get the modification time
-        mod_time = os.path.getmtime(filename_with_timestamp)
-        # Calculate the difference between now and the modification time
-        diff = now - datetime.datetime.fromtimestamp(mod_time)
-        # If the difference is less than 3 seconds, use the existing file
-        if diff.total_seconds() < 3:
-            mode = 'a'
-        else:
-            mode = 'w'
-    else:
-        mode = 'w'
-
-    # Open the file in the selected mode
-    with open(filename_with_timestamp, mode) as f:
+    
+    # Add the date and time to the filename, and add the .txt extension
+    # filename = f"{filename}_{timestamp}.txt" # para python 3.6
+    filename = "{}_{}.txt".format(filename, timestamp) # para python 2.7
+    
+    # Check if file exists, if not, create it
+    if not os.path.exists(filename):
+        open(filename, 'w').close()
+    
+    # Open the file in append mode
+    with open(filename, 'a') as f:
         # Iterate over each argument
         for data in args:
             # Write the data followed by a newline
             f.write(str(data)+' ')
         f.write('\n')
+
 
 def imuCallback(msg):
     global imuOrientX, imuOrientY, imuOrientZ, imuOrientW
@@ -228,6 +205,14 @@ def manualControl(forward, lateral, yaw, deph, roll, pitch):
     pubRoll.publish(roll);
     pubPitch.publish(pitch);  
 
+def trajectoryControl(t):
+    # yawDesired = math.degrees(2*math.sin(0.25*T)*math.cos(0.06*T)-0.5)
+    # yawDesired = math.degrees(2*math.sin(0.5*T))
+    # yawDesired = math.degrees(1.5*math.sin(0.5*T))
+    yawDesired = math.degrees(2*math.sin(0.5*t)*math.cos(0.125*t)-0.5)
+
+    return yawDesired
+
 def talker():
     t = 0.0
     integracionTime = 0.05
@@ -248,10 +233,8 @@ def talker():
         joy_msg = Joy()
         T = t + integracionTime
         t = T
-        # yawDesired = math.degrees(2*math.sin(0.25*T)*math.cos(0.06*T)-0.5)
-        # yawDesired = math.degrees(2*math.sin(0.5*T))
-        # yawDesired = math.degrees(1.5*math.sin(0.5*T))
-        yawDesired = math.degrees(2*math.sin(0.5*T)*math.cos(0.125*T)-0.5)
+
+        yawDesired = trajectoryControl(T)
         Roll, Pitch, Yaw = calculatePose(imuOrientX, imuOrientY, imuOrientZ, imuOrientW)
 
         for i in range(joystick.get_numaxes()): 
@@ -278,7 +261,7 @@ def talker():
             armBluerov2()
             manualControl(msgForward, msgLateral, msgYaw, msgDeph, msgRoll, msgPitch);
             print("Yaw degrees: ",Yaw, "Yaw Deseada: ", yawDesired)
-            write_to_file('manual.txt', "Forward ", msgForward,
+            write_to_file('manual', "Forward ", msgForward,
                           "Lateral ", msgLateral,
                           "Yaw ", msgYaw, 
                           "Deph ", msgDeph,
@@ -302,7 +285,7 @@ def talker():
                   "Control:", output,
                   "Error: ", Yaw-yawDesired)
             
-            write_to_file("control.txt",  "yaw: ", Yaw,
+            write_to_file("control",  "yaw: ", Yaw,
                           "yaw Deseada: ", yawDesired, 
                           "Control:", output,
                           "Error: ", Yaw-yawDesired)
@@ -311,24 +294,63 @@ def talker():
             
         elif Ybutton == 1:
             print("Y button pressed") 
-            armBluerov2()
-            output = controlPDYaw(kpYaw, kdYaw, Yaw, yawDesired, T)
-            # pubYaw.publish(output);
-            print("yaw: ", Yaw,
-                  "yaw Deseada: ", yawDesired,
-                  "Control:", output)
             
-            write_to_file("control.txt" ,"yaw: ", Yaw,
-                          "yaw Deseada: ", yawDesired, 
-                          "Control:", output)
+
         rate.sleep()
 
-if _name_ == '_main_':
+if __name__ == '__main__':
     try:
         talker()
     except rospy.ROSInterruptException:
         pass
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# def write_to_file(filename, *args):
+    
+#     # Check if file exists, if not, create it
+#     if not os.path.exists(filename):
+#         open(filename, 'w').close()
+    
+#     # Open the file in append mode
+#     with open(filename, 'a') as f:
+#         # Iterate over each argument
+#         for data in args:
+#             # Write the data followed by a newline
+#             f.write(str(data)+' ')
+#         f.write('\n')
 
 
 
