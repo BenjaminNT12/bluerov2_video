@@ -64,28 +64,22 @@ def rad_to_deg(rad):
 
 
 def write_to_file(filename, *args):
-    # Get the current date and time
+    # Obtener la fecha y la hora actual
     now = datetime.datetime.now()
-    
-    # Format the date and time as a string
+
+    # Formatear la fecha y la hora en una cadena sin segundos
     timestamp = now.strftime("%Y-%m-%d_%H-%M")
-    
-    # Add the date and time to the filename, and add the .txt extension
-    # filename = f"{filename}_{timestamp}.txt" # para python 3.6
-    filename = "{}_{}.txt".format(filename, timestamp) # para python 2.7
-    
-    # Check if file exists, if not, create it
-    if not os.path.exists(filename):
-        open(filename, 'w').close()
-    
-    # Open the file in append mode
+
+    # Agregar la cadena de fecha y hora al nombre del archivo
+    filename = "{}_{}.txt".format(filename, timestamp)
+
+    # Open the file in the selected mode
     with open(filename, 'a') as f:
         # Iterate over each argument
         for data in args:
             # Write the data followed by a newline
             f.write(str(data)+' ')
         f.write('\n')
-
 
 def imuCallback(msg):
     global imuOrientX, imuOrientY, imuOrientZ, imuOrientW
@@ -132,6 +126,7 @@ def presCallback(msg):
     msgFluidPress = msg.fluid_pressure
     msgVariance = msg.variance
 
+
 def batteryCallback(msg):
     global msgBatteryVoltage, msgBatteryCurrent, msgBatteryPercentage
 
@@ -177,6 +172,11 @@ def controlPDYaw(kp, kd, yawP, yawD, t):
     uThrusters = 1500 + u
     errorOld = errosYaw
 
+    # if uThrusters > 1700:
+    #     uThrusters = 1700
+    # elif uThrusters < 1300:
+    #     uThrusters = 1300
+
     return uThrusters
 
 def calculatePose(x, y, z, w):
@@ -199,29 +199,17 @@ def manualControl(forward, lateral, yaw, deph, roll, pitch):
     pubRoll.publish(roll);
     pubPitch.publish(pitch);  
 
-def trajectoryControl(t):
-    # yawDesired = math.degrees(2*math.sin(0.25*T)*math.cos(0.06*T)-0.5)
-    # yawDesired = math.degrees(2*math.sin(0.5*T))
-    # yawDesired = math.degrees(1.5*math.sin(0.5*T))
-    yawDesired = math.degrees(2*math.sin(0.5*t)*math.cos(0.125*t)-0.5)
-
-    return yawDesired
-
-def main():
+def talker():
     t = 0.0
     integracionTime = 0.05
 
-    # Inicializar el nodo de ROS
     rospy.init_node('control2bluerov', anonymous=True)
     pub = rospy.Publisher('chatter', String, queue_size=10)
     rate = rospy.Rate(20) # 10hz
-
-    # Inicializa todos los módulos importados de Pygame
     pygame.init()
     pygame.joystick.init()
     joystick = pygame.joystick.Joystick(0)
     joystick.init()
-
     # Crear los suscriptores
     subPos = rospy.Subscriber("/BlueRov2/imu/data", Imu, imuCallback)  
     armed = False
@@ -231,8 +219,14 @@ def main():
         joy_msg = Joy()
         T = t + integracionTime
         t = T
-
-        yawDesired = trajectoryControl(T)
+        # yawDesired = math.degrees(2*math.sin(0.25*T)*math.cos(0.06*T)-0.5)
+        # yawDesired = math.degrees(2*math.sin(0.5*T))
+        # yawDesired = math.degrees(1.5*math.sin(0.5*T))
+        # yawDesired = math.degrees(2*math.sin(0.5*T)*math.cos(0.125*T)-0.5)
+        yawDesired = math.degrees(math.sin(1.2*T)*math.sin(1.2*T)+0.9*math.cos(0.5*T))
+        # trayectoria de Rigel
+        # yawDesired = math.degrees(0.5*math.sin(0.7*T)+1.1*math.cos(0.8*T))
+        # yawDesired = math.degrees(0.5*math.sin(0.7*T)*4*math.cos(0.8*T)*math.cos(0.8*T))
         Roll, Pitch, Yaw = calculatePose(imuOrientX, imuOrientY, imuOrientZ, imuOrientW)
 
         for i in range(joystick.get_numaxes()): 
@@ -257,19 +251,13 @@ def main():
             armed = True
             print("A button pressed Bluerov2 Armed")
             armBluerov2()
-            manualControl(msgForward, 
-                          msgLateral, 
-                          msgYaw, 
-                          msgDeph, 
-                          msgRoll, 
-                          msgPitch);
-            
-            print("Yaw degrees: ",Yaw, 
-                  "Yaw Deseada: ", yawDesired)
-            
-            write_to_file('manual', "Forward ", msgForward,
+            manualControl(msgForward, msgLateral, msgYaw, msgDeph, msgRoll, msgPitch);
+            print("Yaw degrees: ",Yaw, "Yaw Deseada: ", yawDesired)
+            write_to_file('manualRigel', "Forward ", msgForward,
                           "Lateral ", msgLateral,
                           "Yaw ", msgYaw, 
+                          "Yaw vel: ", imuVelZ,
+                          "Yaw acc: ", imuLinAccZ,
                           "Deph ", msgDeph,
                           "Roll ", msgRoll,
                           "Pitch ", msgPitch)
@@ -286,80 +274,38 @@ def main():
             armBluerov2()
             output = controlPDYaw(kpYaw, kdYaw, Yaw, yawDesired, T)
             pubYaw.publish(output);
-
-            # imprime en pantalla los valores de los angulos, el control y el error
             print("yaw: ", Yaw,
+                  "Yaw vel: ", imuVelZ,
                   "yaw Deseada: ", yawDesired,
+                  "Yaw acc: ", imuLinAccZ,
                   "Control:", output,
                   "Error: ", Yaw-yawDesired)
             
-            # Guarda los datos en un archivo de texto
-            write_to_file("control",  "yaw: ", Yaw,
+            write_to_file("controlRigel",  "yaw: ", Yaw,
+                          "Yaw vel: ", imuVelZ,
+                          "Yaw acc: ", imuLinAccZ,
                           "yaw Deseada: ", yawDesired, 
                           "Control:", output,
                           "Error: ", Yaw-yawDesired)
             
+            
+            
         elif Ybutton == 1:
             print("Y button pressed") 
+            armBluerov2()
+            output = controlPDYaw(kpYaw, kdYaw, Yaw, yawDesired, T)
+            # pubYaw.publish(output);
+            print("yaw: ", Yaw,
+                  "yaw Deseada: ", yawDesired,
+                  "Control:", output)
             
-
+            write_to_file("control.txt" ,"yaw: ", Yaw,
+                          "yaw Deseada: ", yawDesired, 
+                          "Control:", output)
         rate.sleep()
 
 if __name__ == '__main__':
     try:
-        main()
+        talker()
     except rospy.ROSInterruptException:
         pass
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# def write_to_file(filename, *args):
-    
-#     # Check if file exists, if not, create it
-#     if not os.path.exists(filename):
-#         open(filename, 'w').close()
-    
-#     # Open the file in append mode
-#     with open(filename, 'a') as f:
-#         # Iterate over each argument
-#         for data in args:
-#             # Write the data followed by a newline
-#             f.write(str(data)+' ')
-#         f.write('\n')
-
-
-
-
-
